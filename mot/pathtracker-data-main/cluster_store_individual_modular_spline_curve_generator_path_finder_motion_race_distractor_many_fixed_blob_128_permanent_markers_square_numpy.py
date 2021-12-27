@@ -45,14 +45,14 @@ LABEL_MODE
 '''
 
 parser.add_argument('-r', '--radius', type=int, default=1, help="int: height and width of the squares in stimuli [default 1]")
-parser.add_argument('-n', '--num_samples', type=int, default=20, help="int: number of samples to be generated [default 10]")
+parser.add_argument('-n', '--num_samples', type=int, default=50, help="int: number of samples to be generated [default 10]")
 parser.add_argument('-ss', '--start_sample', type=int, default=0, help="int: number at which to start the sample numbering [default 0]")
 parser.add_argument('-nd', '--num_distractors', type=int, default=12, help="int: number of distractor paths [default 10]")
 parser.add_argument('-pl', '--path_length', type=int, default=64, help="int: length of the paths [default 64]")
 parser.add_argument('-ed', '--extra_dist', type=int, default=0, help="int: number of extra distractors to be added to the movie [defalut 4]")
 parser.add_argument('-sp', '--skip_param', type=int, default=1, help="int: (slice step) number of coordinates to skip from the generated set of full coordinates. Increases the speed of points, by increasing their path length (displacement) but keeping the number of frames same (time). MIN: 1. MAX: 5 [defalut 1]")
 parser.add_argument('-HM', '--HUMAN_MODE', type=str2bool, nargs='?', const=True, default=True, help="bool: Activate human mode. Show path lines for all paths and slow down the movie with extra frames [default False]")
-parser.add_argument('-NS', '--LABEL_MODE', type=int, default=4, help="bool: Generate different label samples [1 2 3 4]")
+parser.add_argument('-NS', '--LABEL_MODE', type=int, default=2, help="bool: Generate different label samples [1 2 3 4]")
 parser.add_argument('-g', '--gif', type=str2bool, const=True, nargs='?', default=True, help="bool: Generate movie frames in gif files, and atore it with the frames [default False]")
 parser.add_argument('-si', '--save_image', type=str2bool, const=True, nargs='?', default=True, help="bool: Store individual frames on disk in individual directories at the specified path. [default False]")
 parser.add_argument('-p', '--path', type=str, default="/users/aarjun1/data/aarjun1/pathtracker/mot/pathtracker-data-main/outer_path/" \
@@ -492,7 +492,6 @@ for sample in range(start_sample,num_samples):
             pass
 
     points = get_points(nPoints)
-    normalized=set([])
 
 
 
@@ -505,15 +504,72 @@ for sample in range(start_sample,num_samples):
     #get full length normalized coordinates for the positive and same length distractor
     #function also returns the updated normalized set
     #calling with 2 extra points so that those can be deleted later
-    '''
-    2 & 4 ---> Start red point
-    3 & 5 ---> End blue point
-    '''
-    coordinates_2, coordinates_3, coordinates_4, coordinates_5, normalized = get_full_length_coordinates(nPoints, nTimes*3, normalized, path_length)
-    #print(normalized)
-    # print(len(coordinates_2))
-    # print(len(coordinates_3))
+    #####################################################################################################################
+    #####################################################################################################################
+    while True:
+        '''
+        2 & 4 ---> Start red point
+        3 & 5 ---> End blue point
+        '''
 
+        normalized=set([])
+
+        # Sampling the Coordinates
+        coordinates_2, coordinates_3, coordinates_4, coordinates_5, normalized = get_full_length_coordinates(nPoints, nTimes*3, normalized, path_length)
+        #print(normalized)
+        # print(len(coordinates_2))
+        # print(len(coordinates_3))
+
+        '''
+        Checking for overlapping rectangular_perimeters
+        '''
+        rr_s = []
+        cc_s = []
+
+        # Opening Red Boxes
+        rr, cc = draw_blobs(coordinates_2[0],blob_height,blob_width)
+        rr_s.append(rr)
+        cc_s.append(cc)
+        rr, cc = draw_blobs(coordinates_4[0],blob_height,blob_width)
+        rr_s.append(rr)
+        cc_s.append(cc)
+
+        # Possible Closing Blue Boxes
+        rr, cc = draw_blobs(coordinates_2[path_length-1],blob_height,blob_width)
+        rr_s.append(rr)
+        cc_s.append(cc)
+        rr, cc = draw_blobs(coordinates_4[path_length-1],blob_height,blob_width)
+        rr_s.append(rr)
+        cc_s.append(cc)
+        rr, cc = draw_blobs(coordinates_3[path_length-1],blob_height,blob_width)
+        rr_s.append(rr)
+        cc_s.append(cc)
+        rr, cc = draw_blobs(coordinates_5[path_length-1],blob_height,blob_width)
+        rr_s.append(rr)
+        cc_s.append(cc)
+
+        count_c = 0
+        bool_value = False
+        for rr_1, cc_1 in zip(rr_s, cc_s):
+            count_c += 1
+            for rr_2, cc_2 in zip(rr_s[count_c:], cc_s[count_c:]):
+                rr_indices = np.arange(rr_1.shape[0])[np.in1d(rr_1, rr_2)]
+                cc_indices = np.arange(cc_1.shape[0])[np.in1d(cc_1, cc_2)]
+                # print('rr_indices : ', rr_indices)
+                # print('cc_indices : ', cc_indices)
+
+                inter_indices = np.arange(rr_indices.shape[0])[np.in1d(rr_indices, cc_indices)]
+                # print('inter_indices : ', inter_indices)
+
+                if len(inter_indices) > 0:
+                    bool_value = bool_value or True
+
+        if not(bool_value):
+            break
+        else:
+            print('Overlap Detected IN : ', sample)
+    #####################################################################################################################
+    #####################################################################################################################
 
     #using third length distractor function for full paths as well
     #coordinates_2,normalized = get_third_length_distractor_coordinates()
@@ -613,7 +669,7 @@ for sample in range(start_sample,num_samples):
         images[frame,rr, cc] = (255,0,0) #128 #red starting open square
         if args.HUMAN_MODE:
             images_human[frame,rr, cc] = (255,0,0)
-
+        
         # 4
         rr, cc = draw_blobs(coordinates_4[0],blob_height,blob_width)
         images[frame,rr, cc] = (255,0,0) #128 #red starting open square
